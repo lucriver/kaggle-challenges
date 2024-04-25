@@ -1,8 +1,15 @@
 ## Statistics Notes
 
+
+#### Handling Data Before Training
+1. Data Loading and EDA
+2. Data Cleaning
+3. Data Transformation
+4. Feature Engineering
+5. Feature Selection
+
 #### Confidence Interval
 - "Based on the sample data we have, if we were to extend our findings to the entire population, we are X% confident that the true population value would fall within this range."
-
 
 #### Univariate Analysis
 - When you analyze data by looking at one variable at a time.
