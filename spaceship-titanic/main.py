@@ -6,10 +6,9 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 from IPython.display import display
-import seaborn as sns
 import matplotlib.pyplot as plt
-import random
 
+import random
 from scipy.stats import chi2_contingency
 from sklearn.feature_selection import chi2
 from sklearn.preprocessing import OneHotEncoder
