@@ -8,36 +8,35 @@ import seaborn as sns
 from IPython.display import display
 import seaborn as sns
 import matplotlib.pyplot as plt
+import random
 
 from scipy.stats import chi2_contingency
 from sklearn.feature_selection import chi2
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import GridSearchCV
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler, PowerTransformer, MinMaxScaler
-from sklearn.ensemble import GradientBoostingClassifier
+from xgboost import XGBClassifier
 
 # Feature extraction
-def extract_GroupId_PersonId(df):
+def feature_extract_GroupId_PersonId(df):
     df['GroupId'] = df['PassengerId'].apply(lambda x: x.split("_")[0]).astype(int)
     df['PersonId'] = df['PassengerId'].apply(lambda x: x.split("_")[1]).astype(int)
     return df
 
-def extract_Deck_Num_Side(df):
+def feature_extract_Deck_Num_Side(df):
     df['Deck'] = df[df['Cabin'].notna()]['Cabin'].str.split('/').apply(lambda x: x[0])
     df['Num'] = df[df['Cabin'].notna()]['Cabin'].str.split('/').apply(lambda x: x[1])
     df['Side'] = df[df['Cabin'].notna()]['Cabin'].str.split('/').apply(lambda x: x[2])
     return df
 
-def extract_FirstName_LastName(df):
+def feature_extract_FirstName_LastName(df):
     df['FirstName'] = df[df['Name'].notna()]['Name'].str.split(' ').apply(lambda x: x[0].strip())
     df['LastName'] = df[df['Name'].notna()]['Name'].str.split(' ').apply(lambda x: x[1].strip())
     return df
 
 # Feature Imputation
-def impute_HomePlanet_HighConfidence(df):
+def feature_impute_HomePlanet_HighConfidence(df):
     def get_groups(df) -> list:
         groups = []
         group_ids = df['GroupId'].unique().tolist()
@@ -72,7 +71,7 @@ def impute_HomePlanet_HighConfidence(df):
 
     return df
 
-def impute_HomePlanet_MediumConfidence(df):
+def feature_impute_HomePlanet_MediumConfidence(df):
     def get_groups(df):
         groups =[]
         group_ids = df['GroupId'].unique().tolist()
@@ -106,7 +105,7 @@ def impute_HomePlanet_MediumConfidence(df):
         
     return df
 
-def impute_Destination_LowConfidence(df):
+def feature_impute_Destination_LowConfidence(df):
     def get_groups(df):
         groups = []
         group_ids = df['GroupId'].unique().tolist()
@@ -140,67 +139,102 @@ def impute_Destination_LowConfidence(df):
     
     return df
 
-def impute_VIPEarth_LowConfidence(df):
-    df.loc[(df['HomePlanet'] == 'Earth') & (df['VIP'].isna()), 'VIP'] = False
-    return df
-
-
-def impute_SpendingMoney_HighConfidence(df):
+def feature_impute_CryoSleep_HighConfidence(df):
     spending_money_cols = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
-    mask = df[(df['CryoSleep'] == True) & (df[spending_money_cols].isna().any(axis=1))].index
+    mask = df[(df['CryoSleep'].isna()) & (df[spending_money_cols].sum(axis=1) > 0.0)].index
+    df.loc[mask, 'CryoSleep'] = False
+    return df
+    
+def feature_impute_SpendingMoneyColumns_MediumConfidence(df):
+    spending_money_cols = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
+    cond_1 = (df['CryoSleep'] == True)
+    cond_2 = (df[spending_money_cols].sum(axis=1) == 0.0)
+    cond_3 = (df[spending_money_cols].isna().any(axis=1))
+    mask = df[cond_1 & cond_2 & cond_3].index
     df.loc[mask, spending_money_cols] = 0.0
     return df
-u
 
+
+def feature_create_TotalSpent_Strict(df):
+    spending_money_cols = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
+    cond_1 = (df[spending_money_cols].notna().all(axis=1))
+    mask = df.loc[cond_1].index
+    df.loc[mask, 'TotalSpent'] = df.loc[mask][spending_money_cols].sum(axis=1)
+    return df
+
+def feature_create_TotalSpent(df):
+    spending_money_cols = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
+    df['TotalSpent'] = df[spending_money_cols].sum(axis=1)
+    return df
+
+
+def optimal_preprocessing(df):
+    # extract features
+    df = feature_extract_GroupId_PersonId(df)
+    df = feature_extract_FirstName_LastName(df)
+    df = feature_extract_Deck_Num_Side(df)
+    
+    # imputation
+    df = feature_impute_HomePlanet_HighConfidence(df)
+    df = feature_impute_HomePlanet_MediumConfidence(df)
+    df = feature_impute_Destination_LowConfidence(df)
+    df = feature_impute_CryoSleep_HighConfidence(df)
+    # df = feature_impute_SpendingMoneyColumns_MediumConfidence(df)    
+
+    # create features
+    df = feature_create_TotalSpent(df) # OR feature_create_TotalSpent_Strict(df)
+    
+    return df
+    
 train_data = './data/train.csv'
-drop_na_train = True
+test_model = True
 
 # preprocess the data
 df = pd.read_csv(train_data)
-
-# extraction
-df = extract_GroupId_PersonId(df)
-df = extract_FirstName_LastName(df)
-df = extract_Deck_Num_Side(df)
-
-# impututation
-df = impute_HomePlanet_HighConfidence(df)
-df = impute_HomePlanet_MediumConfidence(df)
-df = impute_Destination_LowConfidence(df)
-# df = impute_VIPEarth_LowConfidence(df)
-# df = impute_SpendingMoney_HighConfidence(df)
+df = optimal_preprocessing(df)
 
 # training block
 categorical_features = ['HomePlanet', 'CryoSleep', 'Destination', 'VIP', 'Deck' , 'Side']
-continuous_features = ['Age', 'RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck' , 'GroupId', 'PersonId', 'Num']
+continuous_features = ['Age', 'RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck', 'GroupId', 'Num', 'PersonId' ]
+
+engineered_continuous = ['TotalSpent']
+continuous_features = continuous_features + engineered_continuous
+
+# engineered_categorical = []
+# categorical_features = categorical_features + engineered_categorical
+
 target = 'Transported'
 
 df_train = df[categorical_features + continuous_features + [target]]
 
-if drop_na_train:
-    df_train = df_train.dropna()
+drop_cols = [
+    'GroupId',
+    'Num',
+    'PersonId',
+]
 
+if drop_cols:
+    df_train = df_train.drop(columns=drop_cols)
+    
+df_train['VIP'] = df_train['VIP'].astype(pd.BooleanDtype())
+df_train['CryoSleep'] = df_train['CryoSleep'].astype(pd.BooleanDtype())
 df_train = pd.get_dummies(df_train, columns=['HomePlanet', 'Destination'])
-df_train = pd.get_dummies(df_train, columns=['Deck', 'Side'], drop_first=True)
+df_train = pd.get_dummies(df_train, columns=['Deck'], drop_first=False)  
+df_train = pd.get_dummies(df_train, columns=['Side'], drop_first=True)   
 
-display(df_train.columns)
-                          
 X = df_train.drop(columns=['Transported'])
 y = df_train[['Transported']]
 
-# scaler = StandardScaler()
-# X[continuous_features] = scaler.fit_transform(X[continuous_features])
+display(X.columns)
 
-display(X[continuous_features])
-                   
-gb_param_grid = {
-    'loss': ['log_loss', 'exponential'],
-    'n_estimators': [200, 300, 400, 500, 600],
-    'learning_rate': [0.1, 0.01],
-    'max_depth': [2, 3, 4],
+# TRAINING RUN
+param_grid = {
+    'n_estimators': [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
+    'learning_rate': [0.1, 0.01, 0.001],
+    'max_depth': [2, 3, 4, 5],
 }
+gridcv = GridSearchCV(XGBClassifier(n_jobs=-1), param_grid=param_grid, n_jobs=-1, scoring='accuracy', cv=5, verbose=1)
 
-gridcv = GridSearchCV(GradientBoostingClassifier(random_state=42), param_grid=gb_param_grid, n_jobs=32, scoring='accuracy', cv=5, verbose=1)
 
 grid_search = gridcv.fit(X,y.values.ravel())
 
@@ -210,3 +244,31 @@ best_score = grid_search.best_score_
 print("Best score: ", best_score)
 best_estimator = grid_search.best_estimator_
 print("Best estimator: ", best_estimator)
+
+model = gridcv.best_estimator_
+    
+# TEST MODEL ON KAGGLE SET
+if test_model:
+    df_test = pd.read_csv('./data/test.csv')
+    df_test = optimal_preprocessing(df_test)
+
+    df_test['VIP'] = df_test['VIP'].astype(pd.BooleanDtype())
+    df_test['CryoSleep'] = df_test['CryoSleep'].astype(pd.BooleanDtype())
+    
+    categorical_features = ['HomePlanet', 'CryoSleep', 'Destination', 'VIP', 'Deck' , 'Side']
+    continuous_features = ['Age', 'RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck', 'TotalSpent']
+
+    X = df_test[categorical_features + continuous_features]
+    
+    X = pd.get_dummies(X, columns=['HomePlanet', 'Destination'])
+    X = pd.get_dummies(X, columns=['Deck'], drop_first=False)  
+    X = pd.get_dummies(X, columns=['Side'], drop_first=True)   
+    
+    y = model.predict(X)
+    
+    df_test['Transported'] = y.astype('bool')
+    
+    fname = str(random.randint(0,100)) + '.csv'
+    
+    df_test[['PassengerId','Transported']].to_csv(f'./data/{fname}', index=False)
+    
