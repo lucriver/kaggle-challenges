@@ -71,7 +71,86 @@ def impute_HomePlanet_HighConfidence(df):
         df.loc[group_df['HomePlanet'].isna().index, 'HomePlanet'] = home_planet
 
     return df
-  
+
+def impute_HomePlanet_MediumConfidence(df):
+    def get_groups(df):
+        groups =[]
+        group_ids = df['GroupId'].unique().tolist()
+        for group_id in group_ids:
+            group_df = df[df['GroupId'] == group_id]
+
+            missing_home_planet = group_df['HomePlanet'].isna().any()
+            one_distinct_last_name = group_df['LastName'].dropna().nunique() == 1
+            one_distinct_home_planet = group_df['HomePlanet'].dropna().nunique() == 1
+
+            if (
+                missing_home_planet and
+                one_distinct_last_name and
+                one_distinct_home_planet
+            ):
+                groups.append(group_df)
+
+        return groups
+
+    group_dfs = get_groups(df)
+
+    while group_dfs:
+        group_df = group_dfs.pop()
+
+        planets = group_df['HomePlanet'].dropna().unique().tolist()
+
+        if len(planets) != 1:
+            raise ValueError("HUH")
+
+        df.loc[group_df['HomePlanet'].isna().index, 'HomePlanet'] = planets[0]    
+        
+    return df
+
+def impute_Destination_LowConfidence(df):
+    def get_groups(df):
+        groups = []
+        group_ids = df['GroupId'].unique().tolist()
+
+        for group_id in group_ids:
+
+            group_df = df[df['GroupId'] == group_id]
+
+            at_least_one_missing_destination_planet = group_df['Destination'].isna().any()
+            only_one_distinct_destination_planet = group_df['Destination'].dropna().nunique() == 1    
+            only_one_distinct_home_planet = group_df['HomePlanet'].dropna().nunique() == 1
+            only_one_distinct_last_name = group_df['LastName'].dropna().nunique() == 1
+
+            if (
+                at_least_one_missing_destination_planet and
+                only_one_distinct_home_planet and
+                only_one_distinct_destination_planet and
+                only_one_distinct_last_name
+            ):
+                groups.append(group_df)
+
+        return groups
+
+    groups = get_groups(df)
+    while groups:
+        group_df = groups.pop()
+        destination_planets = group_df['Destination'].dropna().unique().tolist()
+        if len(destination_planets) != 1:
+            raise ValueError(len(destination_planets))
+        df.loc[group_df['Destination'].isna().index, 'Destination'] = destination_planets[0]
+    
+    return df
+
+def impute_VIPEarth_LowConfidence(df):
+    df.loc[(df['HomePlanet'] == 'Earth') & (df['VIP'].isna()), 'VIP'] = False
+    return df
+
+
+def impute_SpendingMoney_HighConfidence(df):
+    spending_money_cols = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
+    mask = df[(df['CryoSleep'] == True) & (df[spending_money_cols].isna().any(axis=1))].index
+    df.loc[mask, spending_money_cols] = 0.0
+    return df
+u
 
 train_data = './data/train.csv'
 drop_na_train = True
@@ -86,6 +165,10 @@ df = extract_Deck_Num_Side(df)
 
 # impututation
 df = impute_HomePlanet_HighConfidence(df)
+df = impute_HomePlanet_MediumConfidence(df)
+df = impute_Destination_LowConfidence(df)
+# df = impute_VIPEarth_LowConfidence(df)
+# df = impute_SpendingMoney_HighConfidence(df)
 
 # training block
 categorical_features = ['HomePlanet', 'CryoSleep', 'Destination', 'VIP', 'Deck' , 'Side']
@@ -112,9 +195,9 @@ display(X[continuous_features])
                    
 gb_param_grid = {
     'loss': ['log_loss', 'exponential'],
-    'n_estimators': [50, 100, 200, 300, 400, 500],
-    'learning_rate': [0.1, 0.01, 0.001],
-    'max_depth': [2, 3, 4, 5, 6],
+    'n_estimators': [200, 300, 400, 500, 600],
+    'learning_rate': [0.1, 0.01],
+    'max_depth': [2, 3, 4],
 }
 
 gridcv = GridSearchCV(GradientBoostingClassifier(random_state=42), param_grid=gb_param_grid, n_jobs=32, scoring='accuracy', cv=5, verbose=1)
