@@ -31,3 +31,8 @@ c = tf.matmul(a, b)
 print(c)
 
 # -----------------------------
+
+xgboost_params_grid = {
+    'n_estimators': [200, 300, 400, 500, 600, 700, 800],
+    'learning_rate': [0.1, 0.01, 0.001]
+}
