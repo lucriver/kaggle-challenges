@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 tensorflow-upstream/
+digit-recognizer/data/
 
 # Distribution / packaging
 .Python
