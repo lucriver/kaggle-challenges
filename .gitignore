@@ -8,6 +8,7 @@ __pycache__/
 
 tensorflow-upstream/
 digit-recognizer/data/
+titanic/data/
 
 # Distribution / packaging
 .Python

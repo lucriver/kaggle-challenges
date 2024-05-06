@@ -32,9 +32,19 @@ print(c)
 
 # -----------------------------
 
-xgboost_params_grid = {
-    'n_estimators': [200, 300, 400, 500, 600, 700, 800],
+parameter_grid = {
+    'n_estimators': [700,800,900,1000],
     'learning_rate': [0.1, 0.01, 0.001],
-    'max_depth': [3,5,7],
-    'subsample': [0.5, 0.7, 1]
+    'max_depth': [5,6,7,8],
+    'subsample': [0.6, 0.7, 0.8],
+    'colsample_bytree': []
+}
+
+random_forest_grid = {
+    'bootstrap': [True, False],
+    'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None],
+    'max_features': ['auto', 'sqrt'],
+    'min_samples_leaf': [1, 2, 4],
+    'min_samples_split': [2, 5, 10],
+    'n_estimators': [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
 }
