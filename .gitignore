@@ -4,11 +4,14 @@ __pycache__/
 *$py.class
 
 # C extensions
+
 *.so
 
 tensorflow-upstream/
 digit-recognizer/data/
 titanic/data/
+bitsandbytes-rocm
+text-generation-webui/
 
 # Distribution / packaging
 .Python
