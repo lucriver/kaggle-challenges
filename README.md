@@ -6,4 +6,8 @@
   2. Digit recognizer
     - .98657 (813/1825)
   3. Titanic
+<<<<<<< HEAD
     - .78229
+=======
+    - .76794
+>>>>>>> refs/remotes/origin/main
