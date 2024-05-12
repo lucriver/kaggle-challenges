@@ -12,6 +12,7 @@ digit-recognizer/data/
 titanic/data/
 bitsandbytes-rocm
 text-generation-webui/
+nlp-disaster-tweets/data/weights
 
 # Distribution / packaging
 .Python
